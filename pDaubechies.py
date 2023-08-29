@@ -18,10 +18,9 @@ import pandas as pd
 def dwt(signal):
 
     # db1 (D4) filter coefficients
-    h = [(1 +np.sqrt(3)/4), (3 + np.sqrt(3))/4, (3 - np.sqrt(3))/4, (1 - np.sqrt(3))/4] # low-pass filter coefficients
-    g [h[3], -h[2], h[1], -h[0]] # high-pass filter coefficients
-
-    # Decompose signal into approximation (Low-Pass) and detail (High-Pass) coefficients
+    h = [(1 + np.sqrt(3)) / 4, (3 + np.sqrt(3)) / 4, (3 - np.sqrt(3)) / 4, (1 - np.sqrt(3)) / 4]  # low-pass filter coefficients
+    g = [h[3], -h[2], h[1], -h[0]]  # high-pass filter coefficients
+        # Decompose signal into approximation (Low-Pass) and detail (High-Pass) coefficients
 
     # Low-Pass: Approximation coefficients (Low-frequency resolution, high temporal resolution )
     approx = [ sum(h[k]*signal[i*2 - k] for k in range(4)) for i 

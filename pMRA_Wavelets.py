@@ -297,7 +297,7 @@ if wavelet_choice in ['1', '2', '3']:
     fs = 2*freq  
     t = np.linspace(0, duration, int(fs * duration), endpoint=False)  
     
-    signal = np.sin(2 * np.pi * fs  * t)
+    signal = np.cumsum(np.random.randn(len(t)))
     
     n = len(signal)
     n_pad = int(next_power_of_2(n))
@@ -383,7 +383,7 @@ else:
     # Define Continuous Input Signal
     freq = 22050  # Frequency in Hz
     t = np.linspace(0, 1, freq)  # Time vector
-    signal = np.sin(2 * np.pi * freq * t)  # Sine wave
+    signal = np.cumsum(np.random.randn(len(t)))
 
     # Define scales
     scales = 2**np.arange(4, 14)

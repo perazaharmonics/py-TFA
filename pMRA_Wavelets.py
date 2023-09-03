@@ -24,8 +24,6 @@ from scipy.fftpack import ifft, fftshift
 ## Reference: https://pywavelets.readthedocs.io/en/latest/ref/dwt-discrete-wavelet-transform.html
 ######################################################################
 
-import numpy as np
-
 def next_power_of_2(x):  
     return 1 if x == 0 else 2**(np.ceil(np.log2(x)))
 
@@ -163,120 +161,90 @@ def db6(signal):
 
     return approx, detail
 
-
-######################################################################
-## Continuous Wavelet Transform
-## Description: The continuous wavelet transform (CWT) is a time-frequency representation of signals. It uses a kernel function, called the wavelet, which is scaled and translated over the signal. The CWT is computed as the inner product of the signal with the scaled and translated wavelet.
-## Method: The CWT is computed by convolving the signal with the scaled and translated wavelet. The wavelet is scaled by multiplying it with a dilatation parameter a, and translated by adding a translation parameter b. The CWT is computed as the inner product of the signal with the scaled and translated wavelet.
-######################################################################
-
-# Continuous Wavelet Transform (CWT) Algorithm
-def cwt(signal, wavelet_function, scales):
-    coefficients = []
-    for scale in scales:
-        wavelet_data = wavelet_function(np.linspace(-1, 1, len(signal)), scale)
-        coef = convolve(signal, wavelet_data, mode='same')
-        coefficients.append(coef)
-    return coefficients
-
-
-
-def morlet(t, omega0=6):
-    return np.pi**(-0.25) * np.exp(1j * omega0 * t) * np.exp(-0.5 * t**2)
-
-
-def meyer_wavelet_fourier(omega):
-    result = np.zeros_like(omega)
-    mask1 = (omega >= np.pi) & (omega <= 2 * np.pi)
-    mask2 = (omega >= 2 * np.pi) & (omega <= 4 * np.pi)
-    result[mask1] = np.sin(np.pi / 2 * np.tanh((omega[mask1] - np.pi) / (np.pi - 2)))
-    result[mask2] = np.cos(np.pi / 2 * np.tanh((omega[mask2] - 2 * np.pi) / (2 * np.pi - 3)))
-    return result
-
-def meyer_wavelet_time(N):
-    omega = 2 * np.pi * np.fft.fftfreq(N)
-    meyer_fourier = meyer_wavelet_fourier(omega)
-    meyer_time = fftshift(ifft(meyer_fourier).real)
-    return meyer_time
-
-def meyer(t, scale):
-    N = len(t)
-    meyer_t = meyer_wavelet_time(N)
-    return np.interp(t / scale, t, meyer_t)
-
-######################################################################
-## Define Ricker Wavelet (mexican hat)
-######################################################################
-def mexican_hat(t):
-    return (1 - t**2) * np.exp(-t**2 / 2)
-
-
-
-######################################################################
-## Plotting the Filter Bank Structure
-######################################################################
-
-
-def plot_filter_bank(h, g, fs):
-    N = 512  # Number of points for FFT
-    H = np.fft.fft(h, N)
-    G = np.fft.fft(g, N)
-    freqs = np.fft.fftfreq(N, 1/fs)
-
-    plt.figure(figsize=(12, 4))
-
-    plt.subplot(1, 2, 1)
-    plt.title("Low-pass Filter (h) Frequency Response")
-    plt.plot(freqs[:N//2], np.abs(H)[:N//2])  # Plot only positive frequencies
-    plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Magnitude")
-
-    plt.subplot(1, 2, 2)
-    plt.title("High-pass Filter (g) Frequency Response")
-    plt.plot(freqs[:N//2], np.abs(G)[:N//2])  # Plot only positive frequencies
-    plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Magnitude")
-
-    plt.tight_layout()
-    plt.show()
-
-######################################################################
-## Plot Scalogram
-## Description: A scalogram is a visual representation of the wavelet transform. 
-# It is a plot of the magnitude of the wavelet coefficients as a function of time and scale.
-# Reference: https://pywavelets.readthedocs.io/en/latest/ref/cwt.html
-######################################################################
-def plot_scalogram_and_detail(coefficients, wavelet_name, scales, t):
-    # Plot the Scalogram
-    plt.figure(figsize=(12, 8))
-    plt.subplot(2, 1, 1)
-    plt.imshow(np.abs(coefficients), aspect='auto', extent=[0, 1, min(scales), max(scales)], cmap='jet')
-    plt.colorbar(label="Magnitude")
-    plt.title(f"{wavelet_name} Wavelet Transform (CWT)")
-    plt.xlabel("Time")
-    plt.ylabel("Scale")
-
-    # Plot the detail plot
-    plt.subplot(2, 1, 2)
-    plt.title(f"{wavelet_name} Wavelet Transform (CWT) Detail Coefficients")
-    for scale_idx, scale in enumerate(scales):
-        plt.plot(t, coefficients[scale_idx] + scale_idx * 10)
-        plt.xlabel("Time")
-        plt.ylabel("Detail Coefficients")
+#######################################################################################
+## Synthesis
+## Description: The synthesis filter bank is the inverse of the analysis filter bank. It is used to reconstruct a signal from approximation and detail coefficients.
+## Reference: https://pywavelets.readthedocs.io/en/latest/ref/dwt-discrete-wavelet-transform.html
+#######################################################################################
+def idwt_multilevel(coeffs, wavelet_func):
+    signal = coeffs[0][0]  # Get the approximation coefficients of the highest level
     
-    plt.tight_layout()
-    plt.show()
+    for i in range(len(coeffs) - 1, 0, -1):
+        approx, detail = coeffs[i]
+        signal = wavelet_func(approx, detail, signal)
+    
+    return signal
+
+#######################################################################################
+## Synthesis Haar
+## Description: The synthesis filter bank is the inverse of the analysis filter bank. It is used to reconstruct a signal from approximation and detail coefficients.
+## Reference: https://pywavelets.readthedocs.io/en/latest/ref/dwt-discrete-wavelet-transform.html
+#######################################################################################
 
 
+def inverse_haar(approx, detail, previous_level):
+    # Haar inverse transform
+    reconstructed_signal = []
+    for a, d in zip(approx, detail):
+        reconstructed_signal.extend([(a + d) / 2, (a - d) / 2])
+    return reconstructed_signal
 
+#######################################################################################
+## Synthesis db1
+## Description: The synthesis filter bank is the inverse of the analysis filter bank. It is used to reconstruct a signal from approximation and detail coefficients.
+## Reference: https://pywavelets.readthedocs.io/en/latest/ref/dwt-discrete-wavelet-transform.html
+#######################################################################################
+
+def inverse_db1(approx, detail, previous_level):
+    # Daubechies (db1) inverse transform
+    reconstructed_signal = []
+    for a, d in zip(approx, detail):
+        reconstructed_signal.append(a + d)
+        reconstructed_signal.append(previous_level[-1])
+    return reconstructed_signal
+
+#######################################################################################
+## Synthesis db6
+## Description: The synthesis filter bank is the inverse of the analysis filter bank. It is used to reconstruct a signal from approximation and detail coefficients.
+## Reference: https://pywavelets.readthedocs.io/en/latest/ref/dwt-discrete-wavelet-transform.html
+#######################################################################################
+
+def inverse_db6(approx, detail, previous_level):
+    # Daubechies (db6) inverse transform
+    reconstructed_signal = []
+    h = [1 / (1 + np.sqrt(3)), 3 / (1 + np.sqrt(3)), 3 / (1 - np.sqrt(3)), 1 / (1 - np.sqrt(3))]
+    g = [h[3], -h[2], h[1], -h[0]]
+    
+    for i in range(len(approx)):
+        a = approx[i]
+        d = detail[i]
+        
+        reconstructed_a = 0
+        reconstructed_d = 0
+        
+        for k in range(len(h)):
+            index = i + k  # Corrected index calculation
+            if 0 <= index < len(approx):
+                reconstructed_a += h[k] * a
+                reconstructed_d += g[k] * d
+        
+        reconstructed_signal.append(reconstructed_a)
+        reconstructed_signal.append(reconstructed_d)
+    
+    return reconstructed_signal
+
+
+# Synthesis Implementation
+def synthesis(coeffs, wavelet_func):
+    reconstructed_signal = idwt_multilevel(coeffs, wavelet_func)
+    return reconstructed_signal
+
+# Select wavelet from user input
 def select_wavelet():
-    print("Please select the wavelet type:")
+    print("Please select the DWT type:")
     print("1: Haar")
     print("2: db1 (Daubechies 4)")
     print("3: db6 (Daubechies 12)")
-    print("4: Mexican Hat")
-    print("5: Meyer")
-    print("6: Morlet")
     choice = input("Enter the number corresponding to your choice: ")
     return choice
 
@@ -287,130 +255,128 @@ def select_wavelet():
 ## Description: The following code snippet demonstrates the use of the DWT and CWT on a simple sine wave.
 ######################################################################
 
-# Select wavelet from user input
 wavelet_choice = select_wavelet()
 freq = 22050
-# Processing according to user input
-if wavelet_choice in ['1', '2', '3']:
-    # Define Discrete Input Signal
-    duration = 1  
-    fs = 2*freq  
-    t = np.linspace(0, duration, int(fs * duration), endpoint=False)  
+
+# Define Discrete Input Signal
+duration = 1
+fs = 2 * freq
+t = np.linspace(0, duration, int(fs * duration), endpoint=False)
+
+# Generate the signal dependent on the sampling frequency
+signal = np.cumsum(np.random.randn(len(t)))
+
+n = len(signal)
+n_pad = int(next_power_of_2(n))
+pad_values = n_pad - n
+
+# Pad your signal and time vector
+signal = np.pad(signal, (0, pad_values), 'constant')
+t = np.pad(t, (0, pad_values), 'constant', constant_values=t[-1] + np.mean(np.diff(t)))
+
+n = len(signal)
+n_pad = int(next_power_of_2(n))
+pad_values = n_pad - n
+
+# Pad your signal and time vector
+signal = np.pad(signal, (0, pad_values), 'constant')
+t = np.pad(t, (0, pad_values), 'constant', constant_values=t[-1] + np.mean(np.diff(t)))
+
+levels = 9  # Number of levels in the DWT  
+coeffs = dwt_multilevel(signal, haar if wavelet_choice == '1' else db1 if wavelet_choice == '2' else db6, levels)
+
+
+##########################################################
+## Perform the DWT
+##########################################################
+
+if wavelet_choice == '1':
+    approx, detail = haar(signal)  # Haar wavelet
+elif wavelet_choice == '2':
+    approx, detail = db1(signal)  # db1 (Daubechies 4) wavelet
+elif wavelet_choice == '3':
+    approx, detail = db6(signal)  # db6 (Daubechies 12) wavelet
+else: 
+    print("Invalid choice. Using Haar as default.")
+    approx, detail = haar(signal)  # Haar wavelet
+
+
+reconstructed_signal = synthesis(coeffs, inverse_haar if wavelet_choice == '1' else inverse_db1 if wavelet_choice == '2' else inverse_haar)
+
+# Ensure that the reconstructed_signal has the same length as the original signal
+if len(reconstructed_signal) < len(signal):
+    pad_values = len(signal) - len(reconstructed_signal)
+    reconstructed_signal = np.pad(reconstructed_signal, (0, pad_values), 'constant')
+
+# Truncate the reconstructed_signal if it's longer than the original signal
+if len(reconstructed_signal) > len(signal):
+    reconstructed_signal = reconstructed_signal[:len(signal)]
+
+##########################################################
+# Plotting for DWT
+##########################################################
+# Create a scalogram
+plt.figure(figsize=(12, 8))
+plt.subplot(2 * levels + 1, 1, 1)
+plt.title("Original Signal")
+plt.plot(t, signal)
+
+current_t = np.linspace(t[0], t[-1], len(t)//2)  # Initialize with halved time vector
+for i, (approx, detail) in enumerate(coeffs):
+    stretched_t = np.linspace(t[0], t[-1], len(approx))  # Stretch the time vector to the original length
     
-    signal = np.cumsum(np.random.randn(len(t)))
+    plt.subplot(2 * levels + 1, 1, 2 * i + 2)
+    plt.title(f"Level {i + 1} - Approximation Coefficients")
+    plt.plot(stretched_t, approx)  # Plot against stretched time vector
     
-    n = len(signal)
-    n_pad = int(next_power_of_2(n))
-    pad_values = n_pad - n
-
-    # Pad your signal and time vector
-    signal = np.pad(signal, (0, pad_values), 'constant')
-    t = np.pad(t, (0, pad_values), 'constant', constant_values=t[-1] + np.mean(np.diff(t)))
+    plt.subplot(2 * levels + 1, 1, 2 * i + 3)
+    plt.title(f"Level {i + 1} - Detail Coefficients")
+    plt.plot(stretched_t, detail)  # Plot against stretched time vector
     
-    levels = 9  # Number of levels in the DWT  
-    coeffs = dwt_multilevel(signal, haar if wavelet_choice == '1' else db1 if wavelet_choice == '2' else db6, levels)
-    
-
-    ##########################################################
-    ## Perform the DWT
-    ##########################################################
-    
-    if wavelet_choice == '1':
-        approx, detail = haar(signal)  # Haar wavelet
-    elif wavelet_choice == '2':
-        approx, detail = db1(signal)  # db1 (Daubechies 4) wavelet
-    elif wavelet_choice == '3':
-        approx, detail = db6(signal)  # db6 (Daubechies 12) wavelet
-    else: 
-        print("Invalid choice. Using Haar as default.")
-        approx, detail = haar(signal)  # Haar wavelet
-        
-    ##########################################################
-    # Plotting for DWT
-    ##########################################################
-            # Create a scalogram
-    plt.figure(figsize=(12, 8))
-    plt.subplot(2 * levels + 1, 1, 1)
-    plt.title("Original Signal")
-    plt.plot(t, signal)
-
-    current_t = np.linspace(t[0], t[-1], len(t)//2)  # Initialize with halved time vector
-    for i, (approx, detail) in enumerate(coeffs):
-        stretched_t = np.linspace(t[0], t[-1], len(approx))  # Stretch the time vector to the original length
-        
-        plt.subplot(2 * levels + 1, 1, 2 * i + 2)
-        plt.title(f"Level {i + 1} - Approximation Coefficients")
-        plt.plot(stretched_t, approx)  # Plot against stretched time vector
-        
-        plt.subplot(2 * levels + 1, 1, 2 * i + 3)
-        plt.title(f"Level {i + 1} - Detail Coefficients")
-        plt.plot(stretched_t, detail)  # Plot against stretched time vector
-        
-        current_t = current_t[::2]  # Update for the next level
-
-    plt.tight_layout()
-    plt.show()
-   
-    plt.figure(figsize=(14, 8))
-
-    # Plot original signal
-    plt.subplot(3, 1, 1)
-    plt.title('Original Signal')
-    plt.plot(t, signal)
-    plt.xlabel('Time')
-    plt.ylabel('Amplitude')
-
-    # Plot Approximation Coefficients
-    plt.subplot(3, 1, 2)
-    plt.title('Approximation Coefficients')
-    plt.plot(approx)
-    plt.xlabel('Time')
-    plt.ylabel('Amplitude')
-
-    # Plot Detail Coefficients
-    plt.subplot(3, 1, 3)
-    plt.title('Detail Coefficients')
-    plt.plot(detail)
-    plt.xlabel('Time')
-    plt.ylabel('Amplitude')
-
-    plt.tight_layout()
-    plt.show()
-    
-
-    
-else:
-    # Define Continuous Input Signal
-    freq = 22050  # Frequency in Hz
-    t = np.linspace(0, 1, freq)  # Time vector
-    signal = np.cumsum(np.random.randn(len(t)))
-
-    # Define scales
-    scales = 2**np.arange(4, 14)
+    current_t = current_t[::2]  # Update for the next level
 
 
+plt.tight_layout()
+plt.show()
 
+plt.figure(figsize=(14, 8))
 
-    # Perform the CWT
-    # Lambda expressions to ensure same function signature
-    if wavelet_choice == '4':
-        wavelet_choice = 'Ricker (Mexican Hat))'
-        wavelet_function = lambda t, scale: mexican_hat(t)
-    elif wavelet_choice == '5':
-        wavelet_choice = 'Meyer'
-        wavelet_function = meyer  # already matches the expected function signature
-   
-    elif wavelet_choice == '6':
-        wavelet_choice = 'Morlet'
-        wavelet_function = lambda t, scale: morlet(t, omega0=12)
-    else:
-        print("Invalid choice. Using Mexican Hat as default.")
-        wavelet_function = lambda t, scale: mexican_hat(t)
+# Plot original signal
+plt.subplot(3, 1, 1)
+plt.title('Original Signal')
+plt.plot(t, signal)
+plt.xlabel('Time')
+plt.ylabel('Amplitude')
 
-    coefficients = cwt(signal, wavelet_function, scales)
-    # Normalize the coefficients
-    normalized_coefficients = normalize_zscore(coefficients)
+# Plot Approximation Coefficients
+plt.subplot(3, 1, 2)
+plt.title('Approximation Coefficients')
+plt.plot(normalize_minmax(approx))
+plt.xlabel('Time')
+plt.ylabel('Amplitude')
 
+# Plot Detail Coefficients
+plt.subplot(3, 1, 3)
+plt.title('Detail Coefficients')
+plt.plot(normalize_minmax(detail))
+plt.xlabel('Time')
+plt.ylabel('Amplitude')
 
-    # Plot Scalogram
-    plot_scalogram_and_detail(coefficients, wavelet_choice, scales, t)
+plt.tight_layout()
+plt.show()
+
+# Plot the original signal
+plt.figure(figsize=(10, 5))
+plt.plot(t, signal)
+plt.title('Original Signal')
+plt.xlabel('Time')
+plt.ylabel('Amplitude')
+plt.show()
+
+# Plot the reconstructed signal
+plt.figure(figsize=(10, 5))
+plt.plot(t, reconstructed_signal)
+plt.title('Reconstructed Signal')
+plt.xlabel('Time')
+plt.ylabel('Amplitude')
+plt.show()

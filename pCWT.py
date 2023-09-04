@@ -86,6 +86,8 @@ def meyer(t, scale):
 def mexican_hat(t):
     return (1 - t**2) * np.exp(-t**2 / 2)
 
+def gaussian_wavelet(t, scale=1):
+    return np.exp(-0.5 * (t / scale)**2) / (np.sqrt(scale * np.sqrt(np.pi)))
 
 ######################################################################
 ## Plot Scalogram
@@ -121,6 +123,7 @@ def select_wavelet():
     print("1: Mexican Hat")
     print("2: Meyer")
     print("3: Morlet")
+    print("4: Gaussian")
     choice = input("Enter the number corresponding to your choice: ")
     return choice
 
@@ -135,10 +138,10 @@ def select_wavelet():
 wavelet_choice = select_wavelet()
 freq = 22050
 # Processing according to user input
-if wavelet_choice in ['1', '2', '3']:
+if wavelet_choice in ['1', '2', '3', '4']:
 # Define Continuous Input Signal
     freq = 22050  # Frequency in Hz
-    t = np.linspace(0, 1, freq)  # Time vector
+    t = np.linspace(0, 1, freq)  # Time Svector
     signal = np.cumsum(np.random.randn(len(t)))
 
     # Define scales
@@ -156,6 +159,9 @@ if wavelet_choice in ['1', '2', '3']:
     elif wavelet_choice == '3':
         wavelet_choice = 'Morlet'
         wavelet_function = lambda t, scale: morlet(t, omega0=12)
+    elif wavelet_choice == '4':
+        wavelet_choice = 'Gaussian'
+        wavelet_function = lambda t, scale: gaussian_wavelet(t, scale=scale)
     else:
         print("Invalid choice. Using Mexican Hat as default.")
         wavelet_function = lambda t, scale: mexican_hat(t)
@@ -167,5 +173,3 @@ if wavelet_choice in ['1', '2', '3']:
 
     # Plot Scalogram
     plot_scalogram_and_detail(coefficients, wavelet_choice, scales, t)
-
-    

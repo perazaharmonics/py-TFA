@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy as sp
@@ -52,6 +53,29 @@ def normalize_zscore(data):
     mean_val = np.mean(data)
     std_val = np.std(data)
     return (data - mean_val) / std_val
+
+def awgn(signal, desired_snr_db):
+    """
+    Add AWGN noise to a signal to achieve a desired SNR.
+    
+    :param signal: The clean input signal
+    :param desired_snr_db: Desired SNR in dB
+    :return: Noisy signal
+    """
+    
+    # Calculate signal power
+    signal_power = np.mean(signal ** 2)
+    
+    # Calculate desired noise power based on the desired SNR
+    desired_noise_power = signal_power / (10 ** (desired_snr_db / 10))
+    
+    # Generate AWGN noise with the desired power
+    noise = np.sqrt(desired_noise_power) * np.random.randn(*signal.shape)
+    
+    # Add noise to the signal
+    noisy_signal = signal + noise
+    
+    return noisy_signal
 
 def dwt_multilevel(signal, wavelet_func, levels):
     n = len(signal)
@@ -510,39 +534,7 @@ def generate_time_vector(original_t, target_length):
 ## Description: The following code snippet demonstrates the use of the DWT and CWT on a simple sine wave.
 ######################################################################
 
-import matplotlib.pyplot as plt
-import numpy as np
 
-def plot_scalogram(coeffs):
-    fig, ax = plt.subplots()
-    
-    # The vertical extent of the plot depends on the number of decomposition levels
-    num_levels = len(coeffs)
-    
-    # Initialize vertical placement of the first level
-    vertical_offset = 0
-    
-    # Loop through each level to plot approximation and detail coefficients
-    for level, (approx, detail) in enumerate(coeffs):
-        
-        # The 'extent' sets the left, right, bottom, and top edges of the image
-        extent = [0, len(approx), vertical_offset, vertical_offset + 1]
-        vertical_offset += 1  # Move up for the next level
-        
-        # We plot the detail coefficients at this level
-        ax.imshow(np.abs([detail]), aspect='auto', interpolation='nearest', cmap='jet', extent=extent)
-        
-        # Adjust vertical placement for approximation coefficients
-        extent = [0, len(approx), vertical_offset, vertical_offset + 1]
-        vertical_offset += 1  # Move up for the next level
-        
-        # We plot the approximation coefficients at this level
-        ax.imshow(np.abs([approx]), aspect='auto', interpolation='nearest', cmap='jet', extent=extent)
-    
-    ax.set_title('Discrete Time-Frequency Representation')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Level (Scale)')
-    plt.show()
 
 # Select wavelet from user input
 def select_wavelet():
@@ -562,11 +554,14 @@ def select_wavelet():
 def threshold(coefficients, threshold_value, threshold_type='hard'):
     if threshold_type == 'hard':
         # Hard thresholding
+        
         return np.where(np.abs(coefficients) < threshold_value, 0, coefficients)
     elif threshold_type == 'soft':
         # Soft thresholding
+        
         return np.sign(coefficients) * np.maximum(0, np.abs(coefficients) - threshold_value)
     else:
+        
         raise ValueError("Invalid threshold_type")
 
 # Define a denoising function that applies thresholding to a portion of the signal
@@ -617,7 +612,7 @@ def apply_wavelet(signal, wavelet_choice):
 ## Implementation
 ## Description: The following code snippet demonstrates the use of the DWT and CWT on a simple sine wave.
 ######################################################################
-# Generate time vector
+
 if __name__ == '__main__':
 
     wavelet_choice = select_wavelet()
@@ -627,37 +622,27 @@ if __name__ == '__main__':
     # Define Discrete Input Signal
     duration = 1
     fs = 2 * freq
-
+    # Generate time vector
     t = np.linspace(0, duration, fs*duration)
+    N_pwr = 15
 
     # Generate the signal dependent on the sampling frequency
     signal = np.cumsum(np.random.randn(len(t)))
+    N_signal = awgn(signal, N_pwr)
 
-    # Pad the signal to a power of 2
-    padded_signal, original_length = pad_to_pow2(signal)
+    # Specify denoising parameters
+    threshold_value = 0.33  # Adjust this threshold value as needed
+    threshold_type = 'hard'  # Choose 'soft' or 'hard' thresholding
+    num_processes =  9 # Define the number of parallel processes
 
-
-
-    # Pad the time vector
-    n = len(signal)
-    n_pad = int(next_power_of_2(n))
-    pad_values = n_pad - n
-    mean_dt = np.mean(np.diff(t))
-    padded_t = np.pad(t, (0, pad_values), 'constant', constant_values=(t[-1] + mean_dt))
-
-    # Replace the original signal and time vector with the padded versions
-    signal = padded_signal
-    t = padded_t
-
-    levels = 4  # Number of levels in the DWT  
-    coeffs = dwt_multilevel(signal, haar if wavelet_choice == '1' else db1 if wavelet_choice == '2' else db6, levels)
-     # Specify denoising parameters
-    threshold_value = 0.1  # Adjust this threshold value as needed
-    threshold_type = 'soft'  # Choose 'soft' or 'hard' thresholding
-    num_processes = 4  # Define the number of parallel processes
-
-    # Apply parallel denoising
-    denoised_signal = parallel_denoise(signal, num_processes, threshold_value, threshold_type)
+   
+    levels = 9  # Number of levels in the DWT  
+    coeffs = dwt_multilevel(N_signal, haar if wavelet_choice == '1' else db1 if wavelet_choice == '2' else db6, levels)
+    
+    # After Decomposing the signal, apply the denoising function
+    
+    denoised_signal = parallel_denoise(N_signal, num_processes, threshold_value, threshold_type)
+    
     # Initialize the original time vector t with the length of the signal
     tvec = [t]
 
@@ -671,7 +656,7 @@ if __name__ == '__main__':
     ##########################################################
     ## Perform the DWT
     ##########################################################
-    def apply_wavelet(signal, wavelet_schoize):
+    def apply_wavelet(signal, wavelet_choize):
         approx = []
         detail = []
         if wavelet_choice == '1':
@@ -692,10 +677,7 @@ if __name__ == '__main__':
             approx, detail = haar(signal)  # Haar wavelet
         return approx, detail
 
-    reconstructed_signal = synthesis(coeffs, inverse_haar if wavelet_choice == '1' else inverse_db1 if wavelet_choice == '2' else inverse_haar)
-
-    reconstructed_signal = reconstructed_signal[:original_length]
-
+    
 
     ##########################################################
     # Plotting for DWT
@@ -775,7 +757,7 @@ if __name__ == '__main__':
     plt.ylabel('Amplitude')
     plt.show()
 
-    plot_scalogram(coeffs)
+
 
     plt.figure(figsize=(12, 4))
     plt.subplot(121)
